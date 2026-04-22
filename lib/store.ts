@@ -65,11 +65,24 @@ export const useCart = create<CartStore>()(
         return { items: [...state.items, newItem] }
       }),
 
-      // SUPPRIMER UN PRODUIT
-      // On crée une nouvelle liste qui exclut l'article correspondant à l'ID reçu
-      removeItem: (id) => set((state) => ({
-        items: state.items.filter((item) => item.id !== id),
-      })),
+      // SUPPRIMER OU DIMINUER LA QUANTITÉ
+      removeItem: (id) => set((state) => {
+        const existingItem = state.items.find((item) => item.id === id)
+        
+        // Si l'article a une quantité supérieure à 1, on baisse juste la quantité
+        if (existingItem && existingItem.quantity > 1) {
+          return {
+            items: state.items.map((item) =>
+              item.id === id ? { ...item, quantity: item.quantity - 1 } : item
+            ),
+          }
+        }
+        
+        // Sinon (si c'est le dernier), on le supprime complètement de la liste
+        return {
+          items: state.items.filter((item) => item.id !== id),
+        }
+      }),
 
       // VIDER LE PANIER
       // On remet simplement le tableau d'items à vide
