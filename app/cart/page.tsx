@@ -1,143 +1,154 @@
-'use client' // PRÉCISION : Indique que ce composant est interactif (clics, état, etc.)
+'use client' // Toujours nécessaire pour l'interactivité et l'accès au Store (Zustand)
 
-import { useCart } from '@/lib/store' // On importe notre "cerveau" (Store Zustand)
-import Link from 'next/link' // Composant Next.js pour naviguer entre les pages sans rechargement
-import { toast } from 'react-hot-toast' // On importe l'outil pour afficher des messages d'alerte (Toasts)
+import { useCart } from '@/lib/store' // On importe notre gestionnaire d'état
+import Link from 'next/link' // Pour naviguer vers la boutique
+import { toast } from 'react-hot-toast' // Pour les retours visuels
 
 export default function CartPage() {
   /**
-   * RÉCUPÉRATION DU STORE
-   * On extrait les données (items) et les actions (removeItem, addItem, clearCart)
+   * ACCÈS AU STORE ZUSTAND
+   * On récupère les données (items) et les fonctions de modification.
    */
   const { items, removeItem, addItem, clearCart } = useCart()
 
   /**
-   * CALCUL MATHÉMATIQUE DU TOTAL
-   * .reduce() parcourt le panier pour additionner le (prix * quantité) de chaque produit.
-   * On démarre le compteur à 0.
+   * CALCUL DU MONTANT TOTAL
+   * On multiplie le prix par la quantité pour chaque article.
+   * On utilise 0 comme valeur de départ.
    */
-  const totalPrice = items.reduce((acc, item) => {
-    return acc + (item.price_per_kg * item.quantity)
-  }, 0)
-
-  /**
-   * FONCTION : VIDER LE PANIER AVEC CONFIRMATION
-   * On demande une confirmation visuelle via un toast avant de tout effacer.
-   */
-  const handleClearCart = () => {
-    if (items.length > 0) {
-      clearCart()
-      toast.error("Panier vidé", { icon: '🗑️' })
-    }
-  }
+  const totalPrice = items.reduce((acc, item) => acc + (item.price_per_kg * item.quantity), 0)
 
   return (
-    <main className="min-h-screen bg-stone-50 p-8">
+    /**
+     * NOTE : Le <Header /> global est déjà au-dessus (dans layout.tsx).
+     * On commence donc directement par le contenu du panier.
+     */
+    <main className="p-8 bg-stone-50 min-h-[calc(100vh-80px)]">
       <div className="max-w-4xl mx-auto">
         
-        {/* LIEN DE RETOUR : Utilisation de Link pour une navigation instantanée */}
-        <Link href="/" className="text-amber-900 hover:underline mb-8 inline-block font-medium">
-          ← Retour à la boutique
-        </Link>
+        {/* FIL D'ARIANE / NAVIGATION INTERNE */}
+        <div className="mb-8">
+          <Link 
+            href="/" 
+            className="text-amber-900 font-semibold flex items-center gap-2 hover:translate-x-[-4px] transition-transform duration-200"
+          >
+            ← Continuer mes achats
+          </Link>
+        </div>
 
-        <h1 className="text-4xl font-serif text-amber-900 mb-8 border-b border-stone-200 pb-4">
-          Mon Panier
+        <h1 className="text-4xl font-serif text-amber-900 mb-8 flex items-center gap-4">
+          Votre Panier 
+          <span className="text-sm font-sans bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
+            {items.length} article(s)
+          </span>
         </h1>
 
         {/**
-         * LOGIQUE D'AFFICHAGE :
-         * SI le panier est vide (items.length === 0) -> Message d'accueil vide
-         * SINON -> Liste des produits
+         * AFFICHAGE CONDITIONNEL :
+         * 1. Si le panier est vide
+         * 2. Si le panier contient des articles
          */}
         {items.length === 0 ? (
-          <div className="bg-white p-12 rounded-2xl shadow-sm text-center border border-stone-200">
-            <p className="text-stone-500 mb-6 text-lg">Votre panier est encore vide.</p>
-            <Link href="/" className="bg-amber-900 text-white px-8 py-3 rounded-xl hover:bg-amber-800 transition-all inline-block shadow-md">
-              Découvrir nos produits
+          <div className="bg-white p-16 rounded-3xl shadow-sm text-center border border-stone-200 border-dashed">
+            <div className="text-6xl mb-6">🧺</div>
+            <p className="text-stone-500 text-xl mb-8 font-medium">
+              Il semble que votre panier soit vide pour le moment.
+            </p>
+            <Link 
+              href="/" 
+              className="bg-amber-900 text-white px-8 py-4 rounded-2xl hover:bg-amber-800 transition-all shadow-lg font-bold"
+            >
+              Parcourir la boutique
             </Link>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             
-            {/* BOUCLE (Map) : On génère un bloc HTML pour chaque article présent dans le store */}
-            {items.map((item) => (
-              <div 
-                key={item.id} 
-                className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex justify-between items-center transition-all hover:border-amber-200"
-              >
-                {/* PARTIE GAUCHE : Informations textuelles */}
-                <div>
-                  <h3 className="text-xl font-bold text-stone-800">{item.name}</h3>
-                  <p className="text-stone-500 font-medium">{item.price_per_kg} € / kg</p>
-                </div>
-
-                {/* PARTIE DROITE : Contrôles de quantité et Prix total de la ligne */}
-                <div className="flex items-center gap-6">
-                  
-                  {/* BLOC SÉLECTEUR DE QUANTITÉ */}
-                  <div className="flex items-center border border-stone-200 rounded-lg overflow-hidden bg-stone-50 shadow-inner">
-                    {/* BOUTON MOINS : Diminue la quantité (ou supprime l'objet si qté = 1) */}
-                    <button 
-                      onClick={() => {
-                        removeItem(item.id)
-                        toast.error(`Retiré : ${item.name}`, { icon: '➖' })
-                      }} 
-                      className="px-4 py-2 hover:bg-stone-200 transition-colors border-r border-stone-200 font-bold text-lg"
-                    >
-                      -
-                    </button>
-                    
-                    {/* QUANTITÉ ACTUELLE : Récupérée en temps réel depuis Zustand */}
-                    <span className="px-5 font-bold text-stone-800 min-w-[50px] text-center">
-                      {item.quantity}
-                    </span>
-                    
-                    {/* BOUTON PLUS : Augmente la quantité via l'action addItem du store */}
-                    <button 
-                      onClick={() => {
-                        addItem(item)
-                        toast.success(`Ajouté : ${item.name}`, { icon: '➕' })
-                      }}
-                      className="px-4 py-2 hover:bg-stone-200 transition-colors border-l border-stone-200 font-bold text-lg"
-                    >
-                      +
-                    </button>
+            {/* LISTE DES ARTICLES */}
+            <div className="bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden">
+              {items.map((item, index) => (
+                <div 
+                  key={item.id} 
+                  className={`p-6 flex justify-between items-center transition-colors hover:bg-stone-50 ${
+                    index !== items.length - 1 ? 'border-b border-stone-100' : ''
+                  }`}
+                >
+                  {/* INFOS PRODUIT */}
+                  <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 bg-stone-100 rounded-xl flex items-center justify-center text-2xl shadow-inner">
+                      {item.image_url ? (
+                        <img src={item.image_url} alt={item.name} className="w-full h-full object-cover rounded-xl" />
+                      ) : '🥜'}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-stone-800">{item.name}</h3>
+                      <p className="text-amber-700 font-medium">{item.price_per_kg} € / kg</p>
+                    </div>
                   </div>
-                  
-                  {/* CALCUL DU SOUS-TOTAL : (Prix * Quantité) 
-                      toFixed(2) : Force 2 chiffres après la virgule pour l'aspect monétaire.
-                  */}
-                  <p className="font-bold text-amber-900 w-28 text-right text-xl">
-                    {(item.price_per_kg * item.quantity).toFixed(2)} €
-                  </p>
-                </div>
-              </div>
-            ))}
 
-            {/* SECTION FINALE : Récapitulatif et Actions de fin */}
-            <div className="mt-8 pt-8 border-t-2 border-stone-200 flex flex-col items-end">
-              <div className="text-2xl font-serif mb-6 text-stone-800">
-                Total de votre commande : 
-                <span className="font-bold text-amber-900 ml-4 underline decoration-amber-200 decoration-4 underline-offset-4">
+                  {/* CONTRÔLES ET PRIX UNITAIRE */}
+                  <div className="flex items-center gap-8">
+                    
+                    {/* SÉLECTEUR DE QUANTITÉ OPTIMISÉ */}
+                    <div className="flex items-center border-2 border-stone-100 rounded-xl bg-white shadow-sm overflow-hidden">
+                      <button 
+                        onClick={() => {
+                          removeItem(item.id);
+                          toast.error(`${item.name} diminué`, { icon: '📉' });
+                        }}
+                        className="px-4 py-2 hover:bg-red-50 hover:text-red-600 transition-colors font-bold text-lg"
+                      >
+                        -
+                      </button>
+                      <span className="px-4 font-bold text-stone-700 min-w-[45px] text-center">
+                        {item.quantity}
+                      </span>
+                      <button 
+                        onClick={() => {
+                          addItem(item);
+                          toast.success(`${item.name} ajouté`, { icon: '📈' });
+                        }}
+                        className="px-4 py-2 hover:bg-green-50 hover:text-green-600 transition-colors font-bold text-lg"
+                      >
+                        +
+                      </button>
+                    </div>
+                    
+                    {/* TOTAL DE LA LIGNE */}
+                    <p className="font-bold text-amber-900 w-28 text-right text-xl">
+                      {(item.price_per_kg * item.quantity).toFixed(2)} €
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* RÉCAPITULATIF FINAL */}
+            <div className="bg-amber-900 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="text-center md:text-left">
+                <p className="text-amber-200 uppercase tracking-widest text-sm font-bold mb-1">
+                  Total à régler
+                </p>
+                <h2 className="text-5xl font-serif font-bold">
                   {totalPrice.toFixed(2)} €
-                </span>
+                </h2>
               </div>
               
-              <div className="flex items-center gap-8">
-                {/* ACTION : Vider tout le panier */}
+              <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto text-center">
                 <button 
-                  onClick={handleClearCart}
-                  className="text-stone-400 hover:text-red-600 text-sm transition-colors uppercase tracking-widest font-bold border-b border-transparent hover:border-red-600"
+                  onClick={() => {
+                    clearCart();
+                    toast.error("Panier entièrement vidé", { icon: '🧹' });
+                  }}
+                  className="px-6 py-4 rounded-xl font-bold text-amber-200 hover:text-white transition-colors uppercase text-xs tracking-widest"
                 >
-                  Vider mon panier
+                  Vider le panier
                 </button>
-                
-                {/* ACTION : Bouton final (pourra mener vers Stripe ou un formulaire) */}
                 <button 
-                  onClick={() => toast.loading("Redirection vers le paiement...")}
-                  className="bg-amber-900 text-white px-12 py-4 rounded-2xl font-bold hover:bg-amber-800 transition-all shadow-xl hover:shadow-amber-900/20 active:scale-95 text-lg"
+                  onClick={() => toast.loading("Connexion à la banque...")}
+                  className="bg-white text-amber-900 px-10 py-4 rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg text-lg"
                 >
-                  Procéder au paiement
+                  Commander Maintenant
                 </button>
               </div>
             </div>
