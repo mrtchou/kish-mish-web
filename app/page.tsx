@@ -1,37 +1,32 @@
-'use client' // Toujours nécessaire car on gère l'état des produits et les clics
+'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase' // Connexion DB
-import { useCart } from '@/lib/store' // Connexion Panier
-import { toast } from 'react-hot-toast' // Notifications
+import { supabase } from '@/lib/supabase'
+import { useCart } from '@/lib/store'
+import { toast } from 'react-hot-toast'
+import Link from 'next/link' // <--- IMPORTANT : On importe Link pour la navigation
 
 export default function Home() {
-  // --- ÉTATS LOCAUX ---
-  const [products, setProducts] = useState<any[]>([]) // Liste des produits de la base
-  const [loading, setLoading] = useState(true) // Indicateur de chargement
-  
-  // --- ACTIONS DU PANIER ---
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const addItem = useCart((state) => state.addItem)
 
-  // --- RÉCUPÉRATION DES DONNÉES ---
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // On récupère tous les champs de la table 'products' sur Supabase
         const { data, error } = await supabase.from('products').select('*')
         if (error) throw error
         if (data) setProducts(data)
       } catch (error) {
-        console.error("Erreur lors de la récupération des produits :", error)
+        console.error("Erreur :", error)
         toast.error("Impossible de charger les produits.")
       } finally {
-        setLoading(false) // On retire l'écran de chargement
+        setLoading(false)
       }
     }
     fetchProducts()
   }, [])
 
-  // --- AFFICHAGE PENDANT LE CHARGEMENT ---
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -42,47 +37,43 @@ export default function Home() {
   }
 
   return (
-    /**
-     * NOTE : Nous n'avons plus de balise <header> ici !
-     * Elle est désormais gérée par layout.tsx pour être visible sur tout le site.
-     */
     <main className="p-8">
-      {/* GRILLE DE PRODUITS : Max 6xl pour rester aligné avec le nouveau Header global */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        
-        {/* BOUCLE SUR LES PRODUITS */}
         {products.map((product) => (
           <article 
             key={product.id} 
             className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden flex flex-col hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
           >
-            {/* ZONE IMAGE */}
-            <div className="h-64 w-full bg-stone-100 relative overflow-hidden">
-              {product.image_url ? (
-                <img 
-                  src={product.image_url} 
-                  alt={product.name} 
-                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" 
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-stone-300 text-5xl">🥜</div>
-              )}
-              
-              {/* Badge discret sur l'image (Optionnel) */}
-              <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-amber-900 shadow-sm border border-amber-100">
-                Premium
+            {/* ZONE IMAGE CLIQUABLE */}
+            <Link href={`/products/${product.id}`} className="cursor-pointer">
+              <div className="h-64 w-full bg-stone-100 relative overflow-hidden">
+                {product.image_url ? (
+                  <img 
+                    src={product.image_url} 
+                    alt={product.name} 
+                    className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" 
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-stone-300 text-5xl">🥜</div>
+                )}
+                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-amber-900 shadow-sm border border-amber-100 uppercase tracking-widest">
+                  Voir détails
+                </div>
               </div>
-            </div>
+            </Link>
 
-            {/* ZONE CONTENU */}
             <div className="p-6 flex flex-col flex-grow">
-              <h2 className="text-2xl font-bold text-stone-800 font-serif">{product.name}</h2>
+              {/* TITRE CLIQUABLE */}
+              <Link href={`/products/${product.id}`}>
+                <h2 className="text-2xl font-bold text-stone-800 font-serif hover:text-amber-700 transition-colors cursor-pointer">
+                  {product.name}
+                </h2>
+              </Link>
               
               <p className="text-stone-500 text-sm mt-3 flex-grow italic">
                 {product.description || "Sélectionné avec soin par nos experts."}
               </p>
               
-              {/* PRIX ET BOUTON ACTION */}
               <div className="mt-6 pt-5 border-t border-stone-100 flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-2xl font-bold text-amber-900">

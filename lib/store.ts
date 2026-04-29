@@ -1,47 +1,50 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware' // Middleware qui permet de sauvegarder le store dans le navigateur
+import { persist } from 'zustand/middleware' // Permet de garder le panier en mémoire après un rafraîchissement (LocalStorage)
 
 /**
- * STRUCTURE D'UN ARTICLE DANS LE PANIER
- * On définit les propriétés dont on a besoin pour l'affichage et les calculs.
+ * STRUCTURE D'UN ARTICLE (INTERFACE)
+ * Définit la forme d'un produit lorsqu'il est dans le panier.
  */
 interface CartItem {
   id: string
   name: string
   price_per_kg: number
   quantity: number
-  image_url?: string // Le "?" signifie que cette propriété est optionnelle
+  image_url?: string // Optionnel
 }
 
 /**
- * STRUCTURE GLOBALE DU STORE (ÉTAT + ACTIONS)
- * On liste tout ce que le store contient (les données) et tout ce qu'il peut faire (les fonctions).
+ * DÉFINITION DU STORE (INTERFACE)
+ * Liste toutes les données (états) et les fonctions (actions) disponibles.
  */
 interface CartStore {
-  items: CartItem[] // Le tableau qui contient nos produits ajoutés
-  addItem: (product: any) => void // Fonction pour ajouter ou incrémenter
-  removeItem: (id: string) => void // Fonction pour supprimer un produit
-  clearCart: () => void // Fonction pour vider le panier d'un coup
+  items: CartItem[]
+  addItem: (product: any) => void
+  removeItem: (id: string) => void
+  clearCart: () => void
+  total: () => number     // Calcul du prix total global
+  itemCount: () => number // Calcul du nombre d'articles (ex: pour badge sur icône)
 }
 
 /**
- * CRÉATION DU STORE AVEC PERSISTANCE
- * 'persist' va emballer notre store pour qu'à chaque changement, 
- * une copie soit enregistrée dans le localStorage du navigateur.
+ * CRÉATION DU STORE ZUSTAND
+ * On utilise 'get' en plus de 'set' pour pouvoir lire l'état actuel lors des calculs.
  */
 export const useCart = create<CartStore>()(
   persist(
-    (set) => ({
-      // État initial : le panier est vide
+    (set, get) => ({
+      // --- ÉTAT INITIAL ---
       items: [],
       
-      // AJOUTER UN PRODUIT
+      /**
+       * AJOUTER UN PRODUIT
+       * Logique : Si le produit existe, quantité + 1. Sinon, on l'ajoute.
+       */
       addItem: (product) => set((state) => {
-        // 1. On vérifie si l'article existe déjà dans le panier grâce à son ID
         const existingItem = state.items.find((item) => item.id === product.id)
         
         if (existingItem) {
-          // 2. S'il existe : on parcourt le panier et on augmente uniquement la quantité du produit concerné
+          // Produit déjà présent : on crée un nouveau tableau avec la quantité mise à jour
           return {
             items: state.items.map((item) =>
               item.id === product.id 
@@ -51,8 +54,7 @@ export const useCart = create<CartStore>()(
           }
         }
         
-        // 3. S'il n'existe pas : on prépare un nouvel objet CartItem
-        // On utilise Number() pour s'assurer que le prix est bien traité comme un chiffre (mathématiques)
+        // Nouveau produit : on l'ajoute à la liste avec une quantité de 1
         const newItem: CartItem = {
           id: product.id,
           name: product.name,
@@ -60,37 +62,55 @@ export const useCart = create<CartStore>()(
           quantity: 1,
           image_url: product.image_url
         }
-
-        // 4. On ajoute le nouveau produit à la liste existante (...state.items)
         return { items: [...state.items, newItem] }
       }),
 
-      // SUPPRIMER OU DIMINUER LA QUANTITÉ
+      /**
+       * SUPPRIMER OU RÉDUIRE
+       * Logique : Si quantité > 1, on décrémente. Si quantité = 1, on retire l'objet.
+       */
       removeItem: (id) => set((state) => {
         const existingItem = state.items.find((item) => item.id === id)
         
-        // Si l'article a une quantité supérieure à 1, on baisse juste la quantité
         if (existingItem && existingItem.quantity > 1) {
+          // On réduit juste la quantité de 1
           return {
             items: state.items.map((item) =>
               item.id === id ? { ...item, quantity: item.quantity - 1 } : item
             ),
           }
         }
-        
-        // Sinon (si c'est le dernier), on le supprime complètement de la liste
-        return {
-          items: state.items.filter((item) => item.id !== id),
-        }
+        // On filtre le tableau pour supprimer complètement l'article
+        return { items: state.items.filter((item) => item.id !== id) }
       }),
 
-      // VIDER LE PANIER
-      // On remet simplement le tableau d'items à vide
+      /**
+       * VIDER LE PANIER
+       * Réinitialise le tableau à vide.
+       */
       clearCart: () => set({ items: [] }),
+
+      /**
+       * CALCUL DU TOTAL GÉNÉRAL
+       * Additionne (prix * quantité) de chaque ligne du panier.
+       */
+      total: () => {
+        const items = get().items // On récupère la liste actuelle des produits
+        return items.reduce((acc, item) => acc + (item.price_per_kg * item.quantity), 0)
+      },
+
+      /**
+       * COMPTEUR D'ARTICLES TOTAL
+       * Utile pour afficher "3 articles" dans le récapitulatif ou le header.
+       */
+      itemCount: () => {
+        const items = get().items
+        return items.reduce((acc, item) => acc + item.quantity, 0)
+      }
     }),
     {
-      // CONFIGURATION DE LA PERSISTANCE
-      name: 'kish-mish-cart', // Nom unique de la clé dans le LocalStorage
+      // Nom de la clé de stockage dans le navigateur (LocalStorage)
+      name: 'kish-mish-cart',
     }
   )
 )
