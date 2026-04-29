@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCart } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -8,100 +8,105 @@ import { useRouter } from 'next/navigation'
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, total, clearCart } = useCart() // On récupère les données du panier
+  const { items, total, clearCart } = useCart()
   const [loading, setLoading] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
 
-  // Gestion du formulaire de livraison
+  // Empêche les erreurs d'hydratation (différence entre serveur et client)
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
 
-    // On récupère les données du formulaire
     const formData = new FormData(e.currentTarget)
     
-    // Préparation de l'objet de commande pour la base de données
-    const orderData = {
-      customer_name: formData.get('name'),
-      customer_email: formData.get('email'),
-      shipping_address: formData.get('address'),
-      total_amount: total(),
-      items: items, // On enregistre tout le panier en JSON
-      status: 'pending'
-    }
-
     try {
-      // Insertion dans la table 'orders' de Supabase
-      const { error } = await supabase.from('orders').insert([orderData])
+      console.log("Tentative d'insertion commande...")
+      
+      // 1. Insertion dans 'orders'
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          customer_name: formData.get('name'),
+          customer_email: formData.get('email'),
+          delivery_address: formData.get('address'),
+          total_price: typeof total === 'function' ? total() : total,
+          status: 'en_attente',
+          payment_method: 'cash_on_delivery'
+        }])
+        .select()
+        .single()
 
-      if (error) throw error
+      if (orderError) throw orderError
 
-      // Si ça marche :
-      toast.success('Commande enregistrée !')
-      clearCart() // On vide le panier
-      router.push('/') // On redirige vers l'accueil (ou une page de succès)
-    } catch (error) {
-      console.error(error)
-      toast.error('Erreur lors de la validation de la commande.')
+      // 2. Insertion dans 'order_items'
+      const orderItems = items.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        weight_grams: 1000, 
+        price_at_purchase: item.price_per_kg
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems)
+
+      if (itemsError) throw itemsError
+
+      toast.success('Succès !')
+      clearCart()
+      router.push('/checkout/success')
+
+    } catch (error: any) {
+      console.error('DEBUG ERROR:', error)
+      toast.error(error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  // Si le panier est vide, on n'affiche pas le formulaire
+  // Si le composant n'est pas encore monté sur le client, on ne rend rien (évite les bugs)
+  if (!isMounted) return null
+
+  // Si le panier est vide
   if (items.length === 0) {
-    return <div className="p-20 text-center">Votre panier est vide.</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-xl">Votre panier est vide. Ajoutez des délices pour continuer !</p>
+      </div>
+    )
   }
 
   return (
-    <main className="max-w-4xl mx-auto p-8">
+    <main className="max-w-4xl mx-auto p-8 pt-24"> {/* pt-24 pour éviter que le header cache le titre */}
       <h1 className="text-3xl font-serif text-amber-900 mb-8">Finaliser ma commande</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        {/* FORMULAIRE DE LIVRAISON */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input 
-            name="name" 
-            type="text" 
-            placeholder="Nom complet" 
-            required 
-            className="w-full p-3 border rounded-xl" 
-          />
-          <input 
-            name="email" 
-            type="email" 
-            placeholder="Email" 
-            required 
-            className="w-full p-3 border rounded-xl" 
-          />
-          <textarea 
-            name="address" 
-            placeholder="Adresse de livraison complète" 
-            required 
-            className="w-full p-3 border rounded-xl h-32"
-          ></textarea>
+          <input name="name" type="text" placeholder="Nom complet" required className="w-full p-3 border rounded-xl text-black" />
+          <input name="email" type="email" placeholder="Email" required className="w-full p-3 border rounded-xl text-black" />
+          <textarea name="address" placeholder="Adresse de livraison" required className="w-full p-3 border rounded-xl text-black h-32"></textarea>
           
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-amber-900 text-white py-4 rounded-xl font-bold hover:bg-amber-800 disabled:opacity-50"
+            className="w-full bg-amber-900 text-white py-4 rounded-xl font-bold hover:bg-amber-800 disabled:bg-gray-400"
           >
-            {loading ? 'Validation...' : `Payer ${total()} €`}
+            {loading ? 'Chargement...' : `Confirmer la commande`}
           </button>
         </form>
 
-        {/* RÉCAPITULATIF RAPIDE */}
         <div className="bg-stone-100 p-6 rounded-2xl h-fit">
-          <h2 className="font-bold mb-4">Résumé</h2>
+          <h2 className="font-bold mb-4 text-black">Résumé du panier</h2>
           {items.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm mb-2">
+            <div key={item.id} className="flex justify-between text-sm mb-2 text-stone-700">
               <span>{item.name} x{item.quantity}</span>
               <span>{(item.price_per_kg * item.quantity).toFixed(2)} €</span>
             </div>
           ))}
-          <div className="border-t mt-4 pt-4 font-bold text-lg flex justify-between">
-            <span>Total</span>
-            <span>{total()} €</span>
-          </div>
         </div>
       </div>
     </main>

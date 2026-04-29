@@ -3,6 +3,7 @@
 import { useCart } from '@/lib/store' // On importe notre gestionnaire d'état
 import Link from 'next/link' // Pour naviguer vers la boutique
 import { toast } from 'react-hot-toast' // Pour les retours visuels
+import { useRouter } from 'next/navigation'
 
 export default function CartPage() {
   /**
@@ -11,6 +12,7 @@ export default function CartPage() {
    */
   const { items, removeItem, addItem, clearCart } = useCart()
 
+  const router = useRouter()
   /**
    * CALCUL DU MONTANT TOTAL
    * On multiplie le prix par la quantité pour chaque article.
@@ -145,11 +147,11 @@ export default function CartPage() {
                   Vider le panier
                 </button>
                 <button 
-                  onClick={() => toast.loading("Connexion à la banque...")}
-                  className="bg-white text-amber-900 px-10 py-4 rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg text-lg"
-                >
-                  Commander Maintenant
-                </button>
+  onClick={() => router.push('/checkout')} // On redirige vers le checkout
+  className="bg-white text-amber-900 px-10 py-4 rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg text-lg"
+>
+  Commander Maintenant
+</button>
               </div>
             </div>
           </div>
